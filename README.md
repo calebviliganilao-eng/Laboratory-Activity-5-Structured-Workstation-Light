@@ -46,7 +46,8 @@ The activity uses a structured Read-Process-Write architecture to organize the p
 
 **Disclaimer:** The image below is intended for documentation and reference purposes. Your actual circuit setup may look different depending on your wiring and components.
 
-[ Circuit Image ](images/circuit-image.png)
+<img width="803" height="498" alt="image" src="https://github.com/user-attachments/assets/8220e18e-7e06-4b41-bc07-fd842b01ae87" />
+
 
 ## Working
 
