@@ -53,7 +53,8 @@ The activity uses a structured Read-Process-Write architecture to organize the p
 
 **Disclaimer:** The image below is intended to show the actual working condition of the project. Replace the placeholder with your own photo showing the completed activity.
 
-[ Working Image ](images/working-image.png)
+<img width="442" height="462" alt="image" src="https://github.com/user-attachments/assets/22bb484f-6d59-43d4-af3d-2ffe7ea02e01" />
+
 
 ## Source Code
 
