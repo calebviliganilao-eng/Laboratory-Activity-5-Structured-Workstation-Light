@@ -1,117 +1,185 @@
-# Laboratory Activity 3: GPIO and Button Control
+# Laboratory Activity 5: Structured Workstation Light
 
 ## Overview
 
-This project demonstrates the use of GPIO pins for digital input and output using an ESP32 microcontroller. A push button is used to control two LEDs that work in opposite states. The activity uses the internal pull-up resistor (`INPUT_PULLUP`) and `if/else` statements to control the LEDs based on the button's condition.
+This project demonstrates the use of analog and digital inputs and outputs using an ESP32 microcontroller. A push button is used to enable or disable a workstation light, while a potentiometer controls the brightness of the LED using Pulse Width Modulation (PWM). A separate LED serves as a status indicator to show whether the system is enabled or disabled.
+
+The activity uses a structured Read-Process-Write architecture to organize the program and control the components.
 
 ## Project Features
 
-* **Internal Pull-Up Resistor:** Uses `INPUT_PULLUP` on GPIO 23 to keep the input HIGH when the button is released.
-* **Opposite LED Behavior:** LED 1 turns ON when the button is released, while LED 2 turns ON when the button is pressed.
-* **If/Else Statements:** Uses conditional statements to control the LEDs.
-* **Digital Input and Output:** Demonstrates how a push button and LEDs work with GPIO pins.
+* **Safety Switch:** Uses a push button connected to GPIO 4 with an internal pull-up resistor (`INPUT_PULLUP`) to enable or disable the workstation light.
+* **Brightness Control:** Uses a potentiometer connected to GPIO 34 to adjust the brightness of the LED.
+* **PWM Control:** Uses PWM on GPIO 18 with a frequency of 5 kHz and 8-bit resolution to control LED brightness.
+* **Status Indicator:** Uses an LED connected to GPIO 2 to indicate whether the workstation light is enabled.
+* **Read-Process-Write Architecture:** Uses separate functions (`readInputs()`, `processInputs()`, and `updateOutputs()`) to organize the program.
+* **Serial Monitor Output:** Displays the system status, raw potentiometer reading, and applied PWM duty cycle.
 
 ## Hardware Components
 
 * 1x ESP32 Microcontroller
 * 1x Tactile Push Button
+* 1x Potentiometer
 * 2x LEDs
-* 2x 100Ω Resistors
+* 2x 220Ω–330Ω Resistors
 * 1x Breadboard
 * Jumper Wires
 * 1x USB Cable
 
 ## Pin Wiring Connections
 
-| Component   | Pin         | Connection                      |
-| ----------- | ----------- | ------------------------------- |
-| Push Button | Terminal 1  | GPIO 23                         |
-| Push Button | Terminal 2  | GND                             |
-| LED 1       | Anode (+)   | GPIO 18 through a 100Ω resistor |
-| LED 1       | Cathode (-) | GND                             |
-| LED 2       | Anode (+)   | GPIO 19 through a 100Ω resistor |
-| LED 2       | Cathode (-) | GND                             |
+| **Component** | **Pin**          | **Connection**                       |
+| ------------- | ---------------- | ------------------------------------ |
+| Push Button   | Terminal 1       | GPIO 4                               |
+| Push Button   | Terminal 2       | GND                                  |
+| Potentiometer | Outer Terminal 1 | 3V3                                  |
+| Potentiometer | Center Terminal  | GPIO 34                              |
+| Potentiometer | Outer Terminal 2 | GND                                  |
+| Status LED    | Anode (+)        | GPIO 2 through a 220Ω–330Ω resistor  |
+| Status LED    | Cathode (-)      | GND                                  |
+| PWM LED       | Anode (+)        | GPIO 18 through a 220Ω–330Ω resistor |
+| PWM LED       | Cathode (-)      | GND                                  |
 
-## Circuit Diagram
+**Note:** Connect the potentiometer to 3V3 instead of 5V or VIN to avoid damaging the ESP32 analog input.
+
+## Circuit Image
 
 **Disclaimer:** The image below is intended for documentation and reference purposes. Your actual circuit setup may look different depending on your wiring and components.
 
-<!-- Insert your circuit diagram image here -->
+[ Circuit Image ](images/circuit-image.png)
 
-![Circuit Diagram](images/circuit-diagram.png)
+## Working
 
-## Project Setup
+**Disclaimer:** The image below is intended to show the actual working condition of the project. Replace the placeholder with your own photo showing the completed activity.
 
-**Disclaimer:** The following image is a placeholder for the actual hardware setup. Replace it with your own project photo to show your completed activity.
-
-<!-- Insert your actual hardware setup image here -->
-
-![Hardware Setup](images/hardware-setup.png)
+[ Working Image ](images/working-image.png)
 
 ## Source Code
 
 ```cpp
 #include <Arduino.h>
 
-const uint8_t BUTTON_PIN = 23;
-const uint8_t LED1_PIN = 18;
-const uint8_t LED2_PIN = 19;
+const int BUTTON_PIN = 4;
+const int POT_PIN = 34;
+const int STATUS_LED_PIN = 2;
+const int PWM_LED_PIN = 18;
+
+const int PWM_CHANNEL = 0;
+const int PWM_FREQ = 5000;
+const int PWM_RESOLUTION = 8;
+
+bool isEnabled = false;
+int rawPotValue = 0;
+int appliedDuty = 0;
+bool statusLedOn = false;
+
+int scaleToDuty(int raw) {
+    int clamped = constrain(raw, 0, 4095);
+    return map(clamped, 0, 4095, 0, 255);
+}
+
+void readInputs() {
+    isEnabled = (digitalRead(BUTTON_PIN) == LOW);
+    rawPotValue = analogRead(POT_PIN);
+}
+
+void processInputs() {
+    if (isEnabled) {
+        statusLedOn = true;
+        appliedDuty = scaleToDuty(rawPotValue);
+    } else {
+        statusLedOn = false;
+        appliedDuty = 0;
+    }
+}
+
+void updateOutputs() {
+    digitalWrite(STATUS_LED_PIN, statusLedOn ? HIGH : LOW);
+    ledcWrite(PWM_CHANNEL, appliedDuty);
+}
 
 void setup() {
-  // Enable the internal pull-up resistor
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
+    Serial.begin(115200);
 
-  pinMode(LED1_PIN, OUTPUT);
-  pinMode(LED2_PIN, OUTPUT);
+    pinMode(BUTTON_PIN, INPUT_PULLUP);
+    pinMode(STATUS_LED_PIN, OUTPUT);
 
-  // Set the initial LED states
-  digitalWrite(LED1_PIN, HIGH);
-  digitalWrite(LED2_PIN, LOW);
+    ledcSetup(PWM_CHANNEL, PWM_FREQ, PWM_RESOLUTION);
+    ledcAttachPin(PWM_LED_PIN, PWM_CHANNEL);
+
+    updateOutputs();
 }
 
 void loop() {
-  int buttonState = digitalRead(BUTTON_PIN);
+    readInputs();
+    processInputs();
+    updateOutputs();
 
-  // Check the button state
-  if (buttonState == LOW) {
-    // When the button is pressed
-    digitalWrite(LED1_PIN, LOW);
-    digitalWrite(LED2_PIN, HIGH);
-  } else {
-    // When the button is released
-    digitalWrite(LED1_PIN, HIGH);
-    digitalWrite(LED2_PIN, LOW);
-  }
+    Serial.print("Enabled: ");
+    Serial.print(isEnabled ? "YES" : "NO");
+    Serial.print(" | ADC: ");
+    Serial.print(rawPotValue);
+    Serial.print(" | Applied Duty: ");
+    Serial.println(appliedDuty);
+
+    delay(20);
 }
 ```
 
 ## Observation Summary
 
-| Button State | Input Logic | LED 1 (GPIO 18) | LED 2 (GPIO 19) |
-| ------------ | ----------- | --------------- | --------------- |
-| Released     | HIGH        | ON              | OFF             |
-| Pressed      | LOW         | OFF             | ON              |
+| **Button State**                         | **Input Logic** | **Status LED (GPIO 2)** | **PWM LED (GPIO 18)**     |
+| ---------------------------------------- | --------------- | ----------------------- | ------------------------- |
+| Released                                 | HIGH            | OFF                     | OFF                       |
+| Pressed                                  | LOW             | ON                      | Depends on potentiometer  |
+| Pressed with minimum potentiometer value | LOW             | ON                      | OFF or minimum brightness |
+| Pressed with maximum potentiometer value | LOW             | ON                      | Maximum brightness        |
+
+## Serial Monitor Output
+
+The Serial Monitor displays the current state of the system, the potentiometer reading, and the PWM duty cycle.
+
+Example output:
+
+```text
+Enabled: NO | ADC: 0 | Applied Duty: 0
+Enabled: YES | ADC: 2048 | Applied Duty: 127
+Enabled: YES | ADC: 4095 | Applied Duty: 255
+Enabled: NO | ADC: 3000 | Applied Duty: 0
+```
+
+**Note:** These are sample values. Actual readings may vary depending on the potentiometer position and the ESP32 ADC.
 
 ## How to Run the Project
 
 1. Connect the ESP32 and other components based on the wiring table.
-2. Connect the ESP32 to your computer using a USB cable.
-3. Open the project in Arduino IDE or PlatformIO.
-4. Select the correct ESP32 board and COM port.
-5. Upload the source code to the ESP32.
-6. Wait for the board to restart.
-7. Observe the LEDs and press the push button to test their behavior.
+2. Connect the potentiometer to 3V3, GPIO 34, and GND.
+3. Connect the push button and LEDs to their corresponding GPIO pins.
+4. Connect the ESP32 to your computer using a USB cable.
+5. Open the project in Arduino IDE or PlatformIO.
+6. Select the correct ESP32 board and COM port.
+7. Upload the source code to the ESP32.
+8. Open the Serial Monitor and set the baud rate to 115200.
+9. Press and hold the push button to enable the workstation light.
+10. Rotate the potentiometer to adjust the brightness of the PWM LED.
+11. Release the push button to turn OFF both LEDs.
+12. Observe the Serial Monitor to check the system status, ADC reading, and applied duty cycle.
 
 ## Expected Output
 
-* When the button is released, LED 1 turns ON and LED 2 turns OFF.
-* When the button is pressed, LED 1 turns OFF and LED 2 turns ON.
-* The LEDs change their states depending on the button's condition.
+* When the push button is released, both LEDs remain OFF.
+* When the push button is pressed, the status LED turns ON and the workstation light is enabled.
+* The potentiometer adjusts the brightness of the workstation light while the button is pressed.
+* When the potentiometer is at its minimum value, the PWM LED turns OFF or produces minimum brightness.
+* When the potentiometer is at its maximum value, the PWM LED reaches maximum brightness.
+* The Serial Monitor displays the system status, ADC reading, and applied duty cycle.
 
 ## Conclusion
 
-This activity demonstrates how GPIO pins work as digital inputs and outputs. By using the internal pull-up resistor and `if/else` statements, the push button can control two LEDs with opposite behavior. It also provides a basic understanding of how to read button inputs and control electronic components using an ESP32.
+This activity demonstrates how to control a workstation light using analog and digital inputs with an ESP32 microcontroller. The push button acts as an enable switch, while the potentiometer adjusts the brightness of the LED using PWM. The status LED provides feedback about the system's current state.
+
+By applying the Read-Process-Write architecture, the program becomes more organized and easier to understand. The Serial Monitor also helps observe the input values and output behavior during testing.
 
 ## Disclaimer
 
-This README file is intended for educational and documentation purposes. The images and circuit diagrams should represent the actual project whenever possible. Any sample images or placeholders should be replaced with the actual results of the activity.
+This README file is intended for educational and documentation purposes. The circuit and working images should represent the actual project whenever possible. Any sample images or placeholders should be replaced with the actual results of the activity.

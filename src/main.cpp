@@ -1,32 +1,67 @@
 #include <Arduino.h>
 
-const uint8_t BUTTON_PIN = 23;
-const uint8_t LED1_PIN = 18;
-const uint8_t LED2_PIN = 19;
+const int BUTTON_PIN = 4;
+const int POT_PIN = 34;
+const int STATUS_LED_PIN = 2;
+const int PWM_LED_PIN = 18;
+
+const int PWM_CHANNEL = 0;
+const int PWM_FREQ = 5000;
+const int PWM_RESOLUTION = 8;
+
+bool isEnabled = false;
+int rawPotValue = 0;
+int appliedDuty = 0;
+bool statusLedOn = false;
+
+int scaleToDuty(int raw) {
+    int clamped = constrain(raw, 0, 4095);
+    return map(clamped, 0, 4095, 0, 255);
+}
+
+void readInputs() {
+    isEnabled = (digitalRead(BUTTON_PIN) == LOW);
+    rawPotValue = analogRead(POT_PIN);
+}
+
+void processInputs() {
+    if (isEnabled) {
+        statusLedOn = true;
+        appliedDuty = scaleToDuty(rawPotValue);
+    } else {
+        statusLedOn = false;
+        appliedDuty = 0;
+    }
+}
+
+void updateOutputs() {
+    digitalWrite(STATUS_LED_PIN, statusLedOn ? HIGH : LOW);
+    ledcWrite(PWM_CHANNEL, appliedDuty);
+}
 
 void setup() {
-  // Enables internal pull-up resistor
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
-  
-  pinMode(LED1_PIN, OUTPUT);
-  pinMode(LED2_PIN, OUTPUT);
-  
-  // Set initial outputs matching "released" state
-  digitalWrite(LED1_PIN, HIGH);
-  digitalWrite(LED2_PIN, LOW);
+    Serial.begin(115200);
+
+    pinMode(BUTTON_PIN, INPUT_PULLUP);
+    pinMode(STATUS_LED_PIN, OUTPUT);
+
+    ledcSetup(PWM_CHANNEL, PWM_FREQ, PWM_RESOLUTION);
+    ledcAttachPin(PWM_LED_PIN, PWM_CHANNEL);
+
+    updateOutputs();
 }
 
 void loop() {
-  int buttonState = digitalRead(BUTTON_PIN);
-  
-  // Inverted logic with if/else structure
-  if (buttonState == LOW) {
-    // Button PRESSED
-    digitalWrite(LED1_PIN, LOW);   // LED 1 turns OFF
-    digitalWrite(LED2_PIN, HIGH);  // LED 2 turns ON
-  } else {
-    // Button RELEASED
-    digitalWrite(LED1_PIN, HIGH);  // LED 1 turns ON
-    digitalWrite(LED2_PIN, LOW);   // LED 2 turns OFF
-  }
+    readInputs();
+    processInputs();
+    updateOutputs();
+
+    Serial.print("Enabled: ");
+    Serial.print(isEnabled ? "YES" : "NO");
+    Serial.print(" | ADC: ");
+    Serial.print(rawPotValue);
+    Serial.print(" | Applied Duty: ");
+    Serial.println(appliedDuty);
+
+    delay(20);
 }
